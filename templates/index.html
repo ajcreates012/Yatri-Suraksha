@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Yatra Suraksha — Travel Safety, Watching Over Your Journey</title>
+<meta name="description" content="Real-time location awareness, danger-zone alerts, and instant emergency assistance for travelers.">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<!-- ================= NAVBAR ================= -->
+<header class="navbar" id="navbar">
+  <div class="navbar__inner container">
+    <a href="#home" class="navbar__brand" aria-label="Yatra Suraksha home">
+      <span class="navbar__mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2L3 6v6c0 5.25 3.75 9.75 9 11 5.25-1.25 9-5.75 9-11V6l-9-4z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+          <path d="M8.5 12.2l2.3 2.3 4.7-4.9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+      <span class="navbar__wordmark">Yatra Suraksha</span>
+    </a>
+
+    <nav class="navbar__nav" id="primaryNav" aria-label="Primary">
+      <a href="#home" class="navbar__link is-active">Home</a>
+      <a href="#map" class="navbar__link">Safety Map</a>
+      <a href="#emergency" class="navbar__link">Emergency</a>
+      <a href="#contacts" class="navbar__link">Contacts</a>
+      <a href="#guide" class="navbar__link">Safety Guide</a>
+    </nav>
+
+    <div class="navbar__actions">
+      <button class="btn btn--outline btn--sm" id="navLocateBtn" type="button">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="12" r="5.5" stroke="currentColor" stroke-width="1.8"/></svg>
+        <span>My Location</span>
+      </button>
+      <button class="navbar__burger" id="burgerBtn" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="primaryNav">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main id="home">
+
+  <!-- ================= HERO — asymmetric 58/42 composition ================= -->
+  <section class="hero">
+    <div class="container hero__grid">
+
+      <div class="hero__content">
+        <span class="hero__badge">Personal travel safety, always on</span>
+        <h1 class="hero__headline">Travel with<br>confidence.</h1>
+        <p class="hero__sub">Stay aware of your surroundings with real-time location tracking, danger-zone alerts, and instant emergency assistance.</p>
+
+        <div class="hero__cta">
+          <button class="btn btn--primary btn--lg" id="heroCheckSafety" type="button">Check My Safety</button>
+          <a href="#map" class="btn btn--ghost btn--lg">View Safety Map</a>
+        </div>
+
+        <p class="hero__trust">
+          <span>Real-time location</span>
+          <span class="dot" aria-hidden="true"></span>
+          <span>Zone awareness</span>
+          <span class="dot" aria-hidden="true"></span>
+          <span>Emergency assistance</span>
+        </p>
+      </div>
+
+      <div class="hero__visual" aria-hidden="true">
+        <div class="hero-visual__frame">
+          <svg class="hero-visual__route" viewBox="0 0 420 460" fill="none">
+            <path d="M40 400 C 90 340, 60 260, 130 240 S 260 300, 300 220 S 260 100, 340 60" stroke="#DDE2DC" stroke-width="2" stroke-dasharray="1 9" stroke-linecap="round"/>
+            <path d="M40 400 C 90 340, 60 260, 130 240 S 260 300, 300 220" stroke="#2F7D5A" stroke-width="2.5" stroke-linecap="round"/>
+            <circle cx="40" cy="400" r="6" fill="#2F7D5A"/>
+            <circle cx="300" cy="220" r="16" fill="#D94A45" fill-opacity="0.14"/>
+            <circle cx="300" cy="220" r="7" fill="#D94A45"/>
+          </svg>
+        </div>
+
+        <div class="hero-visual__chip hero-visual__chip--status">
+          <span class="hero-visual__chip-dot"></span>
+          Status: Safe
+        </div>
+        <div class="hero-visual__chip hero-visual__chip--zone">
+          Nearest zone · 350 m
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ================= LIVE SAFETY STATUS — centered dominant state ================= -->
+  <section class="section status-section" id="status" aria-labelledby="statusHeading">
+    <div class="container status-section__inner">
+      <div class="section__head section__head--center">
+        <h2 id="statusHeading">Live safety status</h2>
+        <p>Your current standing, calculated from your live position and nearby zones.</p>
+      </div>
+
+      <div class="status-hero" id="statusPanel" data-state="safe">
+        <div class="status-ring" id="statusRing">
+          <svg viewBox="0 0 200 200" width="200" height="200" aria-hidden="true">
+            <circle cx="100" cy="100" r="88" class="status-ring__track"/>
+            <circle cx="100" cy="100" r="88" class="status-ring__progress" id="statusRingProgress"/>
+          </svg>
+          <div class="status-ring__icon" id="statusIcon">
+            <svg width="46" height="46" viewBox="0 0 24 24" fill="none"><path d="M12 2L3 6v6c0 5.25 3.75 9.75 9 11 5.25-1.25 9-5.75 9-11V6l-9-4z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8.5 12.2l2.3 2.3 4.7-4.9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <span class="status-ring__label" id="statusLabel">SAFE</span>
+        </div>
+
+        <p class="status-hero__message" id="statusMessage">You're currently outside known danger zones.</p>
+        <button class="btn btn--primary" id="statusLocateBtn" type="button">Use my current location</button>
+      </div>
+
+      <dl class="status-meta-row">
+        <div class="status-meta-row__item">
+          <dt>Location</dt>
+          <dd id="statusLocation">Waiting for location…</dd>
+        </div>
+        <div class="status-meta-row__item">
+          <dt>Coordinates</dt>
+          <dd id="statusCoords">Not available</dd>
+        </div>
+        <div class="status-meta-row__item">
+          <dt>Nearest zone</dt>
+          <dd id="statusNearestZone">No danger zones nearby</dd>
+        </div>
+        <div class="status-meta-row__item">
+          <dt>Distance</dt>
+          <dd id="statusDistance">--</dd>
+        </div>
+      </dl>
+    </div>
+  </section>
+
+  <!-- ================= SAFETY MAP — large map + compact panel ================= -->
+  <section class="section map-section" id="map" aria-labelledby="mapHeading">
+    <div class="container">
+      <div class="section__head">
+        <h2 id="mapHeading">Safety map</h2>
+        <p>Your location alongside nearby caution and danger zones.</p>
+      </div>
+
+      <div class="map-composition">
+        <div class="map-shell">
+          <div id="leafletMap" class="map-canvas" role="application" aria-label="Safety map showing your location and nearby zones"></div>
+
+          <div class="map-controls" role="group" aria-label="Map controls">
+            <button class="map-controls__btn" id="mapLocateBtn" type="button" aria-label="Locate me">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="12" r="5.5" stroke="currentColor" stroke-width="1.8"/></svg>
+            </button>
+            <button class="map-controls__btn" id="mapZoomInBtn" type="button" aria-label="Zoom in">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
+            </button>
+            <button class="map-controls__btn" id="mapZoomOutBtn" type="button" aria-label="Zoom out">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M5 12h14" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>
+            </button>
+            <button class="map-controls__btn" id="mapResetBtn" type="button" aria-label="Reset view">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 12a9 9 0 1 1 3 6.7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M3 8v5h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <aside class="map-panel" aria-label="Current zone status">
+          <div class="map-panel__status" id="mapPanelStatus" data-state="safe">
+            <span class="map-panel__status-label" id="mapPanelLabel">SAFE</span>
+            <p id="mapPanelMessage">No danger zones nearby</p>
+          </div>
+
+          <dl class="map-panel__meta">
+            <div>
+              <dt>Nearest zone</dt>
+              <dd id="mapPanelZone">No danger zones nearby</dd>
+            </div>
+            <div>
+              <dt>Distance</dt>
+              <dd id="mapPanelDistance">--</dd>
+            </div>
+          </dl>
+
+          <div class="map-panel__legend">
+            <span class="map-panel__legend-title">Legend</span>
+            <ul class="map-legend">
+              <li><span class="map-legend__dot map-legend__dot--user"></span>User location</li>
+              <li><span class="map-legend__dot map-legend__dot--caution"></span>Caution zone</li>
+              <li><span class="map-legend__dot map-legend__dot--danger"></span>Danger zone</li>
+            </ul>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= DANGER-ZONE ALERT — weight scales with severity ================= -->
+  <section class="section alert-section" id="alert-zone" aria-labelledby="alertHeading">
+    <div class="container">
+      <div class="section__head section__head--center">
+        <h2 id="alertHeading">Zone alert</h2>
+        <p>Updates automatically as your position changes.</p>
+      </div>
+
+      <div class="alert-card" id="alertCard" data-state="safe" role="status">
+        <div class="alert-card__icon" id="alertIcon" aria-hidden="true">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M12 2L3 6v6c0 5.25 3.75 9.75 9 11 5.25-1.25 9-5.75 9-11V6l-9-4z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M8.5 12.2l2.3 2.3 4.7-4.9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="alert-card__body">
+          <span class="alert-card__title" id="alertTitle">All clear</span>
+          <p class="alert-card__text" id="alertText">No danger zones nearby.</p>
+          <div class="alert-card__meta" id="alertMeta" hidden>
+            <span id="alertZoneName"></span>
+            <span class="dot" aria-hidden="true"></span>
+            <span id="alertDistance"></span>
+          </div>
+        </div>
+        <button class="btn btn--outline btn--sm alert-card__cta" id="alertViewMapBtn" type="button" hidden>View on Map</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SOS EMERGENCY — dark, centered, dominant ================= -->
+  <section class="section emergency-section" id="emergency" aria-labelledby="emergencyHeading">
+    <div class="container emergency-inner">
+      <p class="emergency-eyebrow">Need help?</p>
+      <h2 id="emergencyHeading">Immediate assistance is one tap away.</h2>
+      <p class="emergency-sub">Trigger an emergency alert and share your current location with your trusted contacts.</p>
+
+      <button class="sos-button" id="sosButton" type="button" aria-haspopup="dialog">
+        <span class="sos-button__ring" aria-hidden="true"></span>
+        <span class="sos-button__label">SOS</span>
+      </button>
+      <p class="emergency-hint">Tap to start an emergency alert</p>
+
+      <ul class="emergency-pills">
+        <li id="sosLocationPill">Location not shared</li>
+        <li>Trusted contacts</li>
+        <li>Emergency assistance</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- ================= EMERGENCY CONTACTS — weighted hierarchy ================= -->
+  <section class="section contacts-section" id="contacts" aria-labelledby="contactsHeading">
+    <div class="container">
+      <div class="section__head">
+        <h2 id="contactsHeading">Emergency contacts</h2>
+        <p>Who gets notified when you need help.</p>
+      </div>
+
+      <div class="contacts-composition">
+        <div class="contacts-compact">
+          <article class="contact-row">
+            <div class="contact-row__icon" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 5c0-1 1-2 2-2h2l2 4-2 2c1 3 3 5 6 6l2-2 4 2v2c0 1-1 2-2 2-8 0-14-6-14-14z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+            </div>
+            <div class="contact-row__body">
+              <h3>Emergency Services</h3>
+              <p>Police, fire, and medical dispatch.</p>
+            </div>
+            <button class="btn btn--outline btn--sm" type="button" data-action="call-emergency">Call</button>
+          </article>
+
+          <article class="contact-row">
+            <div class="contact-row__icon" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 21s-7-4.6-9.5-9C.6 8.4 2 5 5.3 4.4 7.4 4 9.6 5 12 7.5 14.4 5 16.6 4 18.7 4.4 22 5 23.4 8.4 21.5 12 19 16.4 12 21 12 21z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+            </div>
+            <div class="contact-row__body">
+              <h3>Ambulance</h3>
+              <p>Medical emergency transport.</p>
+            </div>
+            <button class="btn btn--outline btn--sm" type="button" data-action="call-ambulance">Call</button>
+          </article>
+        </div>
+
+        <article class="contact-feature">
+          <span class="contact-feature__tag">Primary contact</span>
+          <div class="contact-feature__icon" aria-hidden="true">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.4" stroke="currentColor" stroke-width="1.6"/><path d="M5 20c1-3.5 4-5.5 7-5.5S18 16.5 19 20" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          </div>
+          <h3 id="trustedContactName">Trusted Contact</h3>
+          <p id="trustedContactDesc">Add someone close to you who should be notified first during an emergency.</p>
+          <div class="contact-feature__actions">
+            <button class="btn btn--primary btn--sm" type="button" data-action="notify-trusted">Notify</button>
+            <button class="btn btn--outline btn--sm" id="manageContactsBtn" type="button">Manage Contacts</button>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= SAFETY GUIDE — editorial composition ================= -->
+  <section class="section guide-section" id="guide" aria-labelledby="guideHeading">
+    <div class="container guide-composition">
+      <div class="guide-intro">
+        <h2 id="guideHeading">Safety guide</h2>
+        <p class="guide-intro__sub">A short checklist for before, during, and after you travel.</p>
+
+        <div class="guide-block">
+          <span class="guide-step">01</span>
+          <div>
+            <h3>Before you travel</h3>
+            <ul>
+              <li>Keep emergency contacts ready</li>
+              <li>Check your route</li>
+              <li>Keep your phone charged</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="guide-pair">
+        <div class="guide-block guide-block--stacked">
+          <span class="guide-step">02</span>
+          <div>
+            <h3>While travelling</h3>
+            <ul>
+              <li>Stay aware of your surroundings</li>
+              <li>Avoid isolated areas</li>
+              <li>Keep location services enabled</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="guide-block guide-block--stacked">
+          <span class="guide-step">03</span>
+          <div>
+            <h3>In an emergency</h3>
+            <ul>
+              <li>Move toward a safe, public location</li>
+              <li>Contact emergency services</li>
+              <li>Use SOS when necessary</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= FINAL CTA — centered ================= -->
+  <section class="section final-cta">
+    <div class="container final-cta__inner">
+      <h2>Your journey is being watched over.</h2>
+      <p>Turn on location awareness now, before you need it.</p>
+      <button class="btn btn--primary btn--lg" id="finalCtaBtn" type="button">Check My Safety</button>
+    </div>
+  </section>
+
+</main>
+
+<!-- ================= FOOTER ================= -->
+<footer class="footer">
+  <div class="container footer__inner">
+    <div class="footer__brand">
+      <span class="navbar__mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none"><path d="M12 2L3 6v6c0 5.25 3.75 9.75 9 11 5.25-1.25 9-5.75 9-11V6l-9-4z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+      </span>
+      <span>Yatra Suraksha</span>
+    </div>
+    <nav class="footer__links" aria-label="Footer">
+      <a href="#home">Home</a>
+      <a href="#map">Safety Map</a>
+      <a href="#emergency">Emergency</a>
+      <a href="#contacts">Contacts</a>
+      <a href="#guide">Safety Guide</a>
+    </nav>
+    <p class="footer__meta">&copy; 2026 Yatra Suraksha. Location data stays on your device unless you trigger an SOS.</p>
+  </div>
+</footer>
+
+<!-- ================= TOASTS ================= -->
+<div class="toast-stack" id="toastStack" aria-live="polite" aria-atomic="true"></div>
+
+<!-- ================= SOS MODAL ================= -->
+<div class="modal-overlay" id="sosModalOverlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="sosModalTitle" id="sosModal">
+    <button class="modal__close" id="sosModalClose" type="button" aria-label="Close">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M5 5l14 14M19 5L5 19" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </button>
+
+    <div id="sosModalConfirmView">
+      <div class="modal__icon modal__icon--danger" aria-hidden="true">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M12 9v4M12 17h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M10.3 3.9L2.6 17.5c-.6 1 .2 2.3 1.4 2.3h16c1.2 0 2-1.3 1.4-2.3L13.7 3.9c-.6-1-2.1-1-2.8 0z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>
+      </div>
+      <h3 id="sosModalTitle">Activate Emergency SOS?</h3>
+      <p>Are you sure you want to trigger an emergency alert? Your trusted contacts will be notified with your location.</p>
+
+      <div class="modal__location" id="sosModalLocation">
+        <span>Current location</span>
+        <strong id="sosModalCoords">Not available — location hasn't been shared yet</strong>
+      </div>
+
+      <div class="modal__actions">
+        <button class="btn btn--outline" id="sosCancelBtn" type="button">Cancel</button>
+        <button class="btn btn--danger" id="sosActivateBtn" type="button">Activate SOS</button>
+      </div>
+    </div>
+
+    <div id="sosModalActiveView" hidden>
+      <div class="modal__icon modal__icon--danger" aria-hidden="true">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <h3>Emergency alert initiated</h3>
+      <p>Your emergency process has started. This is a simulated alert — no real call or SMS has been sent.</p>
+
+      <div class="modal__location">
+        <span>Shared coordinates</span>
+        <strong id="sosActiveCoords">--</strong>
+      </div>
+
+      <div class="modal__actions modal__actions--single">
+        <button class="btn btn--primary" id="sosDoneBtn" type="button">Done</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= CONTACTS MODAL ================= -->
+<div class="modal-overlay" id="contactsModalOverlay" hidden>
+  <div class="modal modal--wide" role="dialog" aria-modal="true" aria-labelledby="contactsModalTitle">
+    <button class="modal__close" id="contactsModalClose" type="button" aria-label="Close">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M5 5l14 14M19 5L5 19" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    </button>
+
+    <h3 id="contactsModalTitle">Manage contacts</h3>
+    <p>These contacts are stored on this device and used for emergency notifications.</p>
+
+    <ul class="contacts-list" id="contactsList"></ul>
+
+    <form class="contact-form" id="contactForm">
+      <h4>Add a contact</h4>
+      <div class="contact-form__row">
+        <div class="field">
+          <label for="contactNameInput">Name</label>
+          <input type="text" id="contactNameInput" name="name" required autocomplete="off" placeholder="e.g. Priya Sharma">
+        </div>
+        <div class="field">
+          <label for="contactRelationInput">Relationship</label>
+          <input type="text" id="contactRelationInput" name="relation" required autocomplete="off" placeholder="e.g. Sister">
+        </div>
+      </div>
+      <div class="field">
+        <label for="contactPhoneInput">Phone number</label>
+        <input type="tel" id="contactPhoneInput" name="phone" required autocomplete="off" placeholder="e.g. +91 98765 43210">
+      </div>
+      <button class="btn btn--primary" type="submit">Add contact</button>
+    </form>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
