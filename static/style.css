@@ -215,12 +215,12 @@ button { font-family: inherit; cursor: pointer; }
 
 .hero__badge {
   display: inline-block;
-  font-size: 13.5px;
+  font-size: 27px;
   font-weight: 600;
   color: var(--green);
-  background: var(--green-light);
-  padding: 7px 14px;
-  border-radius: 999px;
+  
+  /*padding: 7px 14px;
+  border-radius: 999px;*/
   margin-bottom: 24px;
 }
 

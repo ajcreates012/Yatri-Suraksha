@@ -1,6 +1,7 @@
 /* =========================================================
    YATRA SURAKSHA — APPLICATION SCRIPT
-   Vanilla JS with integrated Flask + SQLite backend endpoints.
+   Vanilla JS. Structured so each data-fetching function has a
+   clear seam for a future Flask + SQLite backend.
    ========================================================= */
 
 (function () {
@@ -24,28 +25,30 @@
 
   const CAUTION_BUFFER_METERS = 300; // extra ring outside a zone radius that counts as "approaching"
   const DEFAULT_CENTER = { lat: 28.6139, lng: 77.2090 }; // New Delhi, used before GPS is available
+  const CONTACTS_STORAGE_KEY = 'yatraSuraksha.contacts';
 
   /* ---------------------------------------------------------
-     2. MOCK FALLBACK DANGER ZONE DATA
+     2. TEMPORARY MOCK DANGER ZONE DATA
+     In production, replace with fetchDangerZones() -> GET /api/danger-zones
      --------------------------------------------------------- */
 
   const MOCK_DANGER_ZONES = [
     {
       id: 1,
       name: 'High Risk Zone',
-      lat: 28.6139,
-      lng: 77.2090,
+      latitude: 28.6139,
+      longitude: 77.2090,
       radius: 500,
-      risk: 'high',
+      risk: 'HIGH',
       description: 'Designated high-risk area.'
     },
     {
       id: 2,
       name: 'Caution Zone',
-      lat: 28.6200,
-      lng: 77.2150,
+      latitude: 28.6200,
+      longitude: 77.2150,
       radius: 700,
-      risk: 'medium',
+      risk: 'MEDIUM',
       description: 'Exercise additional caution in this area.'
     }
   ];
@@ -162,6 +165,7 @@
       });
     });
 
+    // Highlight the nav link matching the section currently in view.
     const sections = Array.from(document.querySelectorAll('main section[id], main#home'));
     const observer = new IntersectionObserver(function (entries) {
       entries.forEach(function (entry) {
@@ -205,18 +209,14 @@
   }
 
   /* ---------------------------------------------------------
-     7. DANGER ZONES: LOAD + CHECK (API INTEGRATED)
+     7. DANGER ZONES: LOAD + CHECK
      --------------------------------------------------------- */
 
   async function fetchDangerZones() {
-    try {
-      const response = await fetch('/api/danger-zones');
-      if (!response.ok) throw new Error('Failed to fetch danger zones');
-      return await response.json();
-    } catch (error) {
-      console.error('API Error, loading fallback mock zones:', error);
-      return MOCK_DANGER_ZONES;
-    }
+    // Later:
+    // const response = await fetch("/api/danger-zones");
+    // return await response.json();
+    return MOCK_DANGER_ZONES;
   }
 
   async function loadDangerZones() {
@@ -237,14 +237,11 @@
     let nearest = null;
 
     state.dangerZones.forEach(function (zone) {
-      const zLat = zone.lat || zone.latitude;
-      const zLng = zone.lng || zone.longitude;
-
       const distance = calculateDistance(
         state.userLocation.lat,
         state.userLocation.lng,
-        zLat,
-        zLng
+        zone.latitude,
+        zone.longitude
       );
 
       if (!nearest || distance < nearest.distance) {
@@ -278,6 +275,7 @@
     const previousState = state.safetyState;
     state.safetyState = newState;
 
+    // --- Status panel ---
     dom.statusPanel.setAttribute('data-state', newState);
     dom.alertCard.setAttribute('data-state', newState);
 
@@ -302,11 +300,13 @@
       dom.statusDistance.textContent = '--';
     }
 
+    // Progress ring: fuller ring the closer/less-safe the state.
     const circumference = 2 * Math.PI * 88;
     const offsetByState = { safe: circumference * 0.06, caution: circumference * 0.32, danger: circumference * 0.7 };
     dom.statusRingProgress.style.strokeDasharray = String(circumference);
     dom.statusRingProgress.style.strokeDashoffset = String(circumference - offsetByState[newState]);
 
+    // --- Map panel status echo ---
     dom.mapPanelStatus.setAttribute('data-state', newState);
     dom.mapPanelLabel.textContent = labels[newState];
     dom.mapPanelMessage.textContent = nearest && newState !== 'safe' ? messages[newState] : messages.safe;
@@ -319,6 +319,7 @@
       dom.mapPanelDistance.textContent = '--';
     }
 
+    // --- Alert card ---
     const alertTitles = { safe: 'All clear', caution: 'Caution advised', danger: 'Danger zone entered' };
     const alertTexts = {
       safe: 'No danger zones nearby.',
@@ -339,6 +340,7 @@
       dom.alertViewMapBtn.hidden = true;
     }
 
+    // Notify (toast + optional browser notification) only on state escalation.
     if (newState !== previousState) {
       if (newState === 'danger') {
         showToast('You have entered a designated high-risk area.', 'danger');
@@ -449,12 +451,10 @@
     state.zoneLayers = [];
 
     state.dangerZones.forEach(function (zone) {
-      const zLat = zone.lat || zone.latitude;
-      const zLng = zone.lng || zone.longitude;
-      const isHigh = String(zone.risk).toLowerCase() === 'high';
+      const isHigh = zone.risk === 'HIGH';
       const color = isHigh ? '#D94A45' : '#D99A24';
 
-      const circle = L.circle([zLat, zLng], {
+      const circle = L.circle([zone.latitude, zone.longitude], {
         radius: zone.radius,
         color: color,
         weight: 1.5,
@@ -464,8 +464,8 @@
 
       circle.bindPopup(
         '<strong>' + escapeHtml(zone.name) + '</strong><br>' +
-        escapeHtml(zone.description || '') + '<br>' +
-        '<span style="color:' + color + ';font-weight:600;">' + escapeHtml(String(zone.risk).toUpperCase()) + ' RISK</span>'
+        escapeHtml(zone.description) + '<br>' +
+        '<span style="color:' + color + ';font-weight:600;">' + escapeHtml(zone.risk) + ' RISK</span>'
       );
 
       state.zoneLayers.push(circle);
@@ -525,15 +525,13 @@
     dom.alertViewMapBtn.addEventListener('click', function () {
       document.getElementById('map').scrollIntoView({ behavior: 'smooth' });
       if (state.nearestZone && state.map) {
-        const zLat = state.nearestZone.zone.lat || state.nearestZone.zone.latitude;
-        const zLng = state.nearestZone.zone.lng || state.nearestZone.zone.longitude;
-        centerMapOn(zLat, zLng, 15);
+        centerMapOn(state.nearestZone.zone.latitude, state.nearestZone.zone.longitude, 15);
       }
     });
   }
 
   /* ---------------------------------------------------------
-     11. SOS EMERGENCY FLOW (API INTEGRATED)
+     11. SOS EMERGENCY FLOW
      --------------------------------------------------------- */
 
   function openModal(overlay) {
@@ -594,63 +592,69 @@
   }
 
   async function sendSOS(location) {
-    try {
-      const response = await fetch('/api/sos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          lat: location ? location.lat : null,
-          lng: location ? location.lng : null
-        })
-      });
-      const data = await response.json();
-      return { ok: response.ok, message: data.message };
-    } catch (err) {
-      console.error('Error triggering SOS:', err);
-      return { ok: false, message: 'Could not connect to emergency server.' };
+    if (!location) {
+      throw new Error('Location is not available.');
     }
-  }
 
-  async function activateSOS(location) {
-    const result = await sendSOS(location);
-    if (result.ok) {
-      showToast(result.message || 'Emergency alert dispatched!', 'danger');
-    } else {
-      showToast(result.message, 'danger');
+    const response = await fetch('/api/sos', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        lat: location.lat,
+        lng: location.lng
+      })
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.message || 'Failed to send SOS.');
     }
+
     return result;
+  }
+  async function activateSOS(location) {
+    try {
+      const result = await sendSOS(location);
+
+      showToast('Emergency SMS sent successfully.', 'danger');
+
+      return result;
+    } catch (error) {
+      console.error('SOS error:', error);
+      showToast('Failed to send emergency alert.', 'warning');
+
+      return null;
+    }
   }
 
   /* ---------------------------------------------------------
-     12. EMERGENCY CONTACTS (API INTEGRATED)
+     12. EMERGENCY CONTACTS (localStorage-backed)
      --------------------------------------------------------- */
 
-  async function loadContacts() {
+  function loadContacts() {
     try {
-      const response = await fetch('/api/contacts');
-      if (!response.ok) throw new Error('Failed to load contacts');
-      state.contacts = await response.json();
+      const raw = window.localStorage.getItem(CONTACTS_STORAGE_KEY);
+      state.contacts = raw ? JSON.parse(raw) : defaultContacts();
     } catch (err) {
-      console.error('Failed to load contacts from API:', err);
-      state.contacts = [];
+      state.contacts = defaultContacts();
     }
     renderContacts();
   }
 
-  async function saveContactToBackend(contactData) {
+  function defaultContacts() {
+    return [];
+  }
+
+  function saveContacts() {
     try {
-      const response = await fetch('/api/contacts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(contactData)
-      });
-      if (!response.ok) throw new Error('Failed to save contact');
-      showToast('Contact added successfully!', 'success');
-      await loadContacts();
+      window.localStorage.setItem(CONTACTS_STORAGE_KEY, JSON.stringify(state.contacts));
     } catch (err) {
-      console.error('Error saving contact:', err);
-      showToast('Could not save contact.', 'warning');
+      showToast('Could not save contacts on this device.', 'warning');
     }
+    renderContacts();
   }
 
   function renderContacts() {
@@ -669,12 +673,21 @@
           '<div class="contacts-list__info">' +
             '<div class="contacts-list__name">' + escapeHtml(contact.name) + '</div>' +
             '<div class="contacts-list__meta">' + escapeHtml(contact.relation) + ' · ' + escapeHtml(contact.phone) + '</div>' +
-          '</div>';
+          '</div>' +
+          '<button type="button" class="contacts-list__remove" aria-label="Remove ' + escapeHtml(contact.name) + '">' +
+            '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M5 5l14 14M19 5L5 19" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>' +
+          '</button>';
+
+        item.querySelector('.contacts-list__remove').addEventListener('click', function () {
+          state.contacts = state.contacts.filter(function (c) { return c.id !== contact.id; });
+          saveContacts();
+        });
 
         dom.contactsList.appendChild(item);
       });
     }
 
+    // Update the "Trusted Contact" card on the main page with the first saved contact.
     if (state.contacts.length > 0) {
       const first = state.contacts[0];
       dom.trustedContactName.textContent = first.name;
@@ -694,7 +707,7 @@
       closeModal(dom.contactsModalOverlay);
     });
 
-    dom.contactForm.addEventListener('submit', async function (event) {
+    dom.contactForm.addEventListener('submit', function (event) {
       event.preventDefault();
 
       const formData = new FormData(dom.contactForm);
@@ -704,15 +717,19 @@
 
       if (!name || !relation || !phone) return;
 
-      await saveContactToBackend({
+      state.contacts.push({
+        id: 'contact_' + Date.now(),
         name: name,
         relation: relation,
         phone: phone
       });
 
+      saveContacts();
       dom.contactForm.reset();
+      showToast('Contact added.', 'success');
     });
 
+    // Contact card quick-actions (frontend simulation only).
     document.querySelectorAll('[data-action]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         const action = btn.getAttribute('data-action');
@@ -733,7 +750,7 @@
   }
 
   /* ---------------------------------------------------------
-     13. MODAL GLOBAL BEHAVIOR
+     13. MODAL GLOBAL BEHAVIOR (escape key + click outside)
      --------------------------------------------------------- */
 
   function initModalGlobalBehavior() {
@@ -767,7 +784,7 @@
   }
 
   /* ---------------------------------------------------------
-     15. NAVBAR SCROLL SHADOW
+     15. NAVBAR SCROLL SHADOW (subtle, non-animated-per-frame)
      --------------------------------------------------------- */
 
   function initNavbarScrollState() {
