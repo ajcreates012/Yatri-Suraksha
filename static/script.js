@@ -213,10 +213,25 @@
      --------------------------------------------------------- */
 
   async function fetchDangerZones() {
-    // Later:
-    // const response = await fetch("/api/danger-zones");
-    // return await response.json();
-    return MOCK_DANGER_ZONES;
+    const response = await fetch('/api/danger-zones');
+
+    if (!response.ok) {
+      throw new Error('Failed to load danger zones.');
+    }
+
+    const zones = await response.json();
+
+    return zones.map(function (zone) {
+      return {
+        id: zone.id,
+        name: zone.name,
+        latitude: Number(zone.lat),
+        longitude: Number(zone.lng),
+        radius: Number(zone.radius),
+        risk: String(zone.risk).toUpperCase(),
+        description: zone.description
+      };
+    });
   }
 
   async function loadDangerZones() {
@@ -392,7 +407,32 @@
       { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 }
     );
   }
+  async function checkDangerZoneWithBackend(lat, lng) {
+    try {
+      const response = await fetch('/api/check-danger-zone', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          lat: lat,
+          lng: lng
+        })
+      });
 
+      const result = await response.json();
+
+      if (!response.ok) {
+        console.error('Danger zone check failed:', result);
+        return;
+      }
+
+      console.log('Danger zone check:', result);
+
+    } catch (error) {
+      console.error('Backend danger-zone error:', error);
+    }
+  }
   function onLocationSuccess(position) {
     const lat = position.coords.latitude;
     const lng = position.coords.longitude;
@@ -400,13 +440,20 @@
     state.userLocation = { lat: lat, lng: lng };
 
     dom.statusLocation.textContent = 'Location detected';
-    dom.statusCoords.textContent = lat.toFixed(5) + ', ' + lng.toFixed(5);
+    dom.statusCoords.textContent =
+      lat.toFixed(5) + ', ' + lng.toFixed(5);
 
     updateUserMarker(lat, lng);
     centerMapOn(lat, lng, 15);
+
     checkDangerZones();
 
-    if (dom.sosLocationPill) dom.sosLocationPill.textContent = 'Location shared';
+    // Send location to Flask for danger-zone verification
+    checkDangerZoneWithBackend(lat, lng);
+
+    if (dom.sosLocationPill) {
+      dom.sosLocationPill.textContent = 'Location shared';
+    }
 
     showToast('Location updated.', 'success');
   }
